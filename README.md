@@ -6,6 +6,10 @@ DevKit3 is a desktop app for Windows and Linux that brings your development proj
 
 Working on an older PHP application and a new Node.js project? Keep a separate setup for each and switch between them without repeatedly configuring your tools.
 
+## Getting Started
+
+To get started, open the [Releases page](https://github.com/minhnguyenerp/devkit3/releases/tag/DevKit3), download the installer from its **Assets** section. Run the downloaded installer, then open DevKit3 to set up your project list.
+
 ## What You Can Do
 
 - **Organize your projects.** Keep your work in one place and arrange related projects into groups.
