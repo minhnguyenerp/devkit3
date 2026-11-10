@@ -18,7 +18,9 @@ The **Terminal** tool keeps the stable project ID `Cmd`. DevKit3 detects x-termi
 
 ## Software packages
 
-Publish assets named `<ToolId>-linux-<x64|arm64>-<version>.tar.gz` or `.zip`. TAR.GZ is preferred because Linux distributions normally preserve executable modes and relative symbolic links in this format. ZIP links are also restored inside the installation directory. Never repackage a Windows binary under a Linux asset name.
+Publish assets named `<ToolId>-linux-<x64|arm64>-<version>.tar.gz` or `.zip`. TAR.GZ is preferred because Linux distributions normally preserve executable modes and relative symbolic links in this format. ZIP links are also restored inside the installation directory, but a ZIP created on Windows has no Unix modes, so its executables cannot run. Archives must not contain links with absolute targets or targets outside the package: DevKit3 refuses to extract them. Never repackage a Windows binary under a Linux asset name.
+
+Every current Linux package is made by the scripts in [Scripts/](../Scripts/linux/linux_packages.md), which describe where each one comes from and how to rebuild, test and publish it. CodeLite has no Linux package yet.
 
 For most tools, put the executable at the archive root or in `bin/`. A single distribution directory wrapping the package is also detected. For a different prepared layout, use `packageRoot=` and `executable=` in the tool settings. The Linux executable candidates are defined in [LinuxToolLayout.cs](../Tools/LinuxToolLayout.cs). Arduino expects `arduino-ide`; VSCode expects `code`. Node accepts `bin/node` and exports both the package root and its `bin` directory. .NET expects `dotnet` at the archive root. PHP expects `php.ini` at the package root and `php`/`php-cgi` there or in `bin`; preserve its Linux extension configuration.
 
@@ -32,15 +34,3 @@ Visual Studio, MSVC, WinLibs, Rust (MSVC), Notepad++, HeidiSQL, the Windows ILSp
 - Nginx, Caddy and Sphinx Search use native Linux executables with per-project configuration and process tracking.
 
 Choose a web port such as `8080` on Linux if your account cannot bind port `80`. Database packages may need distribution libraries supplied alongside the binaries or installed on the machine.
-
-## Build and checks
-
-With the .NET 10 SDK installed:
-
-```bash
-dotnet run --project DevKit3.csproj
-dotnet run --project tests/ReleaseCatalog.Tests.csproj
-dotnet run --project tests/ArduinoIntegration/Arduino.Tests.csproj -- --platform-checks
-```
-
-Run these checks manually when needed. They use prepared fixture packages and a harmless native shell process; they do not launch every third-party application. Real GUI and packaged server smoke tests are still needed for each package you publish.
