@@ -136,11 +136,3 @@ The ARM64 Linux archive named `Tabby-linux-arm64-1.0.238.gz` contains a TAR arch
 DevKit3 reads the published release index in batches, uses embedded assets for ordinary releases, and paginates large asset lists. Unpublished tool tags are skipped without generating one error for each absent package. Network failures retain cached versions; system tools still refresh locally.
 
 The migration tests check the inventory against a fixture extracted from DevKit2, representative executable layouts and launch arguments, SDK environments, MSVC component discovery, service configuration, and process/auxiliary cleanup using harmless loopback-listener fixtures. They do not claim that all 69 real applications have been launched successfully. Those require the actual prepared packages and OS-specific testing.
-
-Run:
-
-```powershell
-dotnet build DevKit3.csproj
-dotnet run --project tests/ReleaseCatalog.Tests.csproj
-dotnet run --project tests/ArduinoIntegration/Arduino.Tests.csproj
-```
