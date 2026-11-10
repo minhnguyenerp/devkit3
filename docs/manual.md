@@ -4,6 +4,8 @@ DevKit3 manages your software projects on Windows and Linux. For each project it
 
 On Linux, install Git, a desktop terminal, `xdg-utils`, and `secret-tool` with an unlocked Secret Service keyring. Local credentials use the desktop keyring; Windows uses DPAPI. Project tokens still use the encrypted shared vault. Use Linux tool packages and replace Windows-only tools in projects you open on Linux. Choose an unprivileged web port such as `8080` when necessary.
 
+The macOS terminal integration opens Terminal.app with the selected working directory and tool environment. It uses the configured shell, falling back to zsh or bash. This terminal support does not imply full macOS application support: the local secret store still needs a macOS Keychain implementation.
+
 - [1. Concepts](#1-concepts)
 - [2. First start: the config repository](#2-first-start-the-config-repository)
 - [3. Creating access tokens](#3-creating-access-tokens)
@@ -17,6 +19,7 @@ On Linux, install Git, a desktop terminal, `xdg-utils`, and `secret-tool` with a
 - [10. Setting up another machine](#10-setting-up-another-machine)
 - [11. Where DevKit3 keeps its data](#11-where-devkit3-keeps-its-data)
 - [12. Troubleshooting](#12-troubleshooting)
+- [13. Git cheatsheet](#13-git-cheatsheet)
 
 ---
 
@@ -65,6 +68,35 @@ The project list is synced between your machines.
 ### Option B: This machine only
 
 The project list stays on this machine (in a local git repository without remote). You can connect it to a remote repository later: open **Settings**, choose **Git repository** and enter the URL and token. If that repository already holds projects, the two lists are merged (see [section 4.1](#41-working-on-several-machines)).
+
+### Choosing another project file
+
+Without arguments, DevKit3 uses `devkit3-projects.json`. To use another project list in the **same configuration repository**, launch it with `--project-file=my-project.json` or `--project-file my-project.json`:
+
+```powershell
+# Windows
+.\DevKit3.exe --project-file=my-project.json
+```
+
+```sh
+# Linux/macOS executable, when built for that operating system
+./DevKit3 --project-file=my-project.json
+
+# Running the .NET application directly, on any supported OS
+dotnet DevKit3.dll --project-file=my-project.json
+```
+
+The value is a `.json` filename in the repository root, not a path relative to the terminal. Quote filenames containing spaces, such as `--project-file="my projects.json"`. Paths, reserved filenames and `devkit3-tokens.json` are rejected consistently on all platforms. A missing file starts with an empty project list and is created on the first save; existing lists are not renamed or copied. The selected filename appears in Settings and the status bar, and is used for loading, saving, committing and project conflict resolution.
+
+The option applies to that launch; supply it again (or add it to the shortcut/launcher) to return to that list. Repository settings, local tool installations, tracked processes and `devkit3-tokens.json` remain shared. Cleanup checks all project JSON files in the repository, including lists other than the one currently selected, and shows each reference's filename. If another file has conflicting changes on both machines during sync, sync stops without replacing local commits so that conflict can be resolved first.
+
+### 2.1 Updating DevKit3
+
+On Windows x64, open **Settings → Check for update**. DevKit3 checks the [DevKit3 release](https://github.com/minhnguyenerp/devkit3/releases/tag/DevKit3) for a newer `DevKit3-win-x64-<version>.exe` and shows the current version, new version and download size before asking whether to download and install. Same or older versions are not installed. Save any Settings changes before updating.
+
+After approval, the installer downloads into a unique folder under `%TEMP%\DevKit3Updates`. Progress and **Cancel update** are shown in Settings. DevKit3 validates the download size and release SHA-256 checksum, starts the installer as a separate process, then exits so you can complete the normal installation wizard. If downloading, validation, or launching the installer fails (including canceled Windows elevation), DevKit3 stays open and shows the error.
+
+On the next application start, temporary installers and partial downloads are cleaned in the background. An active download is protected by a file lock. If the installer is still holding its file, cleanup retries and leaves it for a later start if necessary. Other temporary files, installed tools, projects and service data are kept. This application update check is independent of each project tool's Auto Update setting.
 
 ---
 
@@ -159,9 +191,19 @@ Launch lists every tool DevKit3 supports on the current operating system. Search
 
 Choose the application's version, optional working directory (defaults to your home folder), tool-specific settings, extra PATH folders and environment variables. Relative paths use the working directory. Add helper tools with **+ Helper tool**: **InPath** contributes PATH and environment; **Launch** also starts the helper before the main application. Missing portable versions are installed automatically.
 
-Click **Save configuration** to save without running; **Launch** also saves. Configurations remain available when switching applications or views; click Save before closing DevKit3 to keep edits. These profiles, including environment values as plain text, are stored in this machine's local.json and are not synced with the project repository. Tool settings use the same keys documented in section 5.
+**Launch** and **Terminal** automatically save configuration. These profiles, including manually entered environment values as plain text, are stored in this machine's local.json and are not synced with the project repository. Tool settings use the same keys documented in section 5.
 
-**Stop** stops the selected application's tools and helpers. Running tools reuse their current process; stop them and launch again to apply configuration changes. Standalone tools also participate in **Stop all** in the Projects view.
+Every tool has **+ Add variable**, with name, masked value and description fields like the Project editor. Values are encrypted in the same `devkit3-tokens.json` vault used by Projects and synced to other machines. The same variable name reuses the same saved value across Projects and Launch tools. Leave a value empty to keep its saved value. Launch and Terminal apply the selected variables to the application, helpers and terminal; local.json stores only their names and descriptions.
+
+**Stop** stops the selected application's tools and helpers. Running tools reuse their current process; stop them and launch again to apply configuration changes. **Stop all** in the main toolbar stops tools across both Projects and Launch.
+
+### 4.2 Cleanup
+
+Open **Cleanup** in the toolbar to see installed portable tool versions, their sizes, and why each version is kept. Select an **Unused** version and click **Clean selected version** to remove it. Usage is checked again before deletion. References from all projects (including hidden projects), saved Launch configurations, Auto Update's latest installed version, and active tools protect installations. Only the Git installation bound to the current DevKit3 session is protected for configuration and repository operations; other Git versions can be removed when unreferenced. Project references distinguish the selected version, Auto Update's selected fallback, and its current installed version. System installations are not managed here.
+
+**Clean downloads** removes cached packages and partial downloads; it keeps the offline version catalog and installed tools. Packages are downloaded again if needed. Cleanup keeps project folders, settings and per-project service data. Scanning and deleting run in the background; use **Refresh** to update the list after other changes.
+
+New launches record the exact versions of the application and its PATH dependencies, so running projects protect the versions they actually launched with even if the project is edited later. Older process records without dependency snapshots protect their own recorded tool version and versions referenced by the current project/Launch configuration; missing dependency metadata does not block every installed version.
 
 ---
 
@@ -172,6 +214,7 @@ The **Tools** tab lists the tools of the project. For each tool choose:
 | Field | Meaning |
 |---|---|
 | Tool and version | Portable tools are downloaded and installed by DevKit3 the first time a project needs them, under `~/DevKit3/Data/apps`. Projects using the same version share one installation. |
+| Auto Update | Off by default: keep the selected version. Turn it on to check for and use the latest available version when opening the project; missing portable versions are installed automatically. The selected version remains the fallback and is used again if you turn Auto Update off. System tools use the latest locally installed version. Stop and reopen running tools to apply an update. |
 | Launch / InPath | **Launch**: started when the project opens. **InPath**: only added to `PATH` (and its variables set), so you can call it from a terminal. |
 | Primary | The main tool, started last after the services (usually VSCode). Only one per project, Launch mode only. |
 | Settings | Tool options, one `key=value` per line. An empty box shows an example. |
@@ -212,6 +255,10 @@ Visual Studio discovery uses Microsoft's `vswhere`, included with Visual Studio 
 ### Running services
 
 Nginx, Caddy, PostgreSQL and SphinxSearch are also available as per-project services. Nginx/Caddy support `port=`, `webRoot=`, optional `config=`, and `phpPort=` when the project includes PHP. PostgreSQL uses `port=5432` and optional `dataDirectory=`; SphinxSearch uses `port=9312` and optional `config=`. Service data is kept in each project's instance directory by default. Select **Launch** to start a service when opening the project.
+
+Etcd runs as a local single-member server per project or Launch instance. Settings: `port=2379` (client), `peerPort=2380`, `name=default`, `logLevel=info`, optional `dataDirectory=` and `instanceDirectory=`. Both listeners bind to `127.0.0.1`. Data defaults to the instance's `data` folder; logs go to `logs/etcd.log`. Terminal sets `ETCDCTL_ENDPOINTS` for `etcdctl`. Simultaneous instances need distinct client and peer ports. Keep the member name and peer port unchanged when reusing data; existing membership changes require `etcdctl member update`. Stop targets the recorded PID and start time. Windows Stop forcibly terminates only that process: upstream Etcd 3.7.3 has no graceful interrupt handler on Windows. Linux/macOS Stop sends SIGTERM and waits up to 30 seconds for a clean shutdown; on failure it reports an error and retains tracking rather than force killing the server.
+
+Consul runs as a local single-node server per project or Launch instance. Settings: `mode=server`, `port=8500` (HTTP/UI), `dnsPort=8600`, `serverPort=8300` (RPC), `lanPort=8301`, `wanPort=8302`, and `logLevel=info`. Use distinct values for all five ports across simultaneous instances. All listeners bind to localhost; HTTPS and gRPC listeners are disabled. UI is at `http://127.0.0.1:8500/ui/` (adjust the HTTP port). Persistent server data lives in `data`, generated configuration in `consul.json`, and rotating logs in `logs` inside the instance directory. Windows server instances select BoltDB to avoid the new-directory WAL sync failure. Optional `dataDirectory=` and `instanceDirectory=` override paths. `mode=dev` uses separate `dev-data` and temporary in-memory KV storage; it loses KV data on restart. Terminal sets `CONSUL_HTTP_ADDR` for this instance. Stop verifies the recorded PID/start time and node identity, requests graceful leave via the local agent API, and waits for exit. If shutdown fails, tracking is retained and an error is reported without force killing.
 
 Two projects can run MariaDB (or Apache) at the same time as long as they use different ports. Always set `port=` explicitly: DevKit3 refuses to save two projects that set the same port, and when starting it reports a port that is already in use.
 
@@ -270,9 +317,13 @@ The **Repositories** tab lists the git repositories cloned into the project fold
 | User | See [the table in section 3](#what-to-put-in-the-user-field). Empty means `x-access-token` (GitHub). |
 | Token | The token, encrypted in `devkit3-tokens.json` under the auth variable name and synced. Leave empty to keep the saved token. |
 
-After you save a new project, DevKit3 creates its folder, clones configured repositories and runs `git submodule update --init --recursive` for each repository. The selected branch is used for a new clone; leaving it empty uses the remote's default branch. Repositories without submodules need no special configuration. Creating the project does not install or launch its tools.
+After you save a new project, DevKit3 creates its folder, clones missing configured repositories with `git clone --depth 1`, and runs `git submodule update --init --recursive --depth 1` only immediately after each new clone. The selected branch is used for a new clone; leaving it empty uses the remote's default branch. Repositories without submodules need no special configuration. Creating the project does not install or launch its tools.
 
-Opening a project also checks for missing clones and retries recursive submodule setup. The destination of a new clone must be empty or missing. A root repository is prepared before independent child repositories. Existing root checkouts are not pulled, reset or switched to another branch. Submodules are updated to the commits recorded by their containing repositories, without `--force`. If setup fails, the saved project and files remain; use **Open** to retry after fixing the cause. Private submodules need access through the configured token or your existing Git authentication.
+These shallow checkouts include the current code with minimal history. Submodules still use the exact commits recorded by the parent. For history-dependent work or builds, fetch more history using `git fetch --deepen=100` or `git fetch --unshallow` in the affected repository/submodule; fetch other branches or older tags explicitly when needed. Existing checkouts are not converted to shallow repositories. The configuration repository retains its full history because project-list sync needs common ancestors for merging changes and deletions.
+
+Opening a project checks for missing clones. Existing checkouts (including repositories using a `.git` file) skip submodule updates, and are not pulled, reset or switched to another branch. The destination of a new clone must be empty or missing. A root repository is prepared before independent child repositories. During a new clone's setup, submodules are updated to the commits recorded by their containing repositories, without `--force`. If submodule setup fails after cloning, the saved project and files remain; fix the cause and run `git submodule update --init --recursive` manually in that repository. Reopening the project will keep skipping submodule setup once the repository exists. Private submodules need access through the configured token or your existing Git authentication.
+
+Repository preparation shows the current operation (checking, cloning, configuring authentication, or initializing submodules), destination folder, elapsed time, Git PID, and its most recent output. Git's transfer progress is streamed as it arrives. After 30 seconds without output, the status explicitly says Git or a helper is waiting; elapsed time alone is not evidence of download progress. Errors include Git's diagnostic output with credentials redacted. **Cancel** stops the active Git process and its child helpers. Existing checkouts explicitly report that cloning and submodule updates were skipped.
 
 ### 7.1 Using the same token in many repositories and projects
 
@@ -317,6 +368,10 @@ The project environment contains the token, so authentication works **automatica
 - in a terminal started with **Terminal**;
 - when DevKit3 clones the repositories.
 
+Terminals and tools launched by DevKit3 also inherit URL-scoped Git credential helpers through the process environment. Recursive Git commands, including `git submodule update --remote --recursive`, receive these helpers automatically; no manual `git -c credential.helper=...` arguments are needed. A single configured token/user for a server also applies to submodules under other paths on that same server. Credentials are not forwarded to a different server unless that server is separately configured in the project. If the project defines different credentials for different repositories on the same server, helpers remain scoped to those repository URLs rather than guessing which token an unrelated submodule should use. Existing inherited Git configuration is preserved, and helper definitions contain variable names rather than token values.
+
+After changing tokens or updating DevKit3, open a new project **Terminal**, or close and reopen the editor through DevKit3. Already-running terminals and editors retain their old environment.
+
 It does **not** work when git runs outside DevKit3 (a normal command prompt, VSCode started from the Start menu, GitHub Desktop, ...). There the variable does not exist, and git fails with an authentication error instead of asking for a password. Start your tools from DevKit3, or, if you really need it, set the variable (e.g. `GH_TOKEN_ACME`) as a Windows user environment variable. Be aware that a Windows environment variable is stored unencrypted.
 
 ---
@@ -357,8 +412,10 @@ Projects default to `~/DevKit3/Projects`. App data is under `~/DevKit3/Data` (`~
 | `local.json` | Config repository URL, project folders of this machine, running processes |
 | `secrets.json` | The config repository token and the remembered tokens password, encrypted with DPAPI for your Windows account |
 | `apps\<tool>\<version>\` | Installed tools |
-| `instances\<project id>\<tool>\` | Per-project data: MariaDB database, Apache logs, VSCode settings, `custom.ini` / `custom.conf` |
+| `instances\project-<project name>-<project id>\<tool>\` | Per-project data: MariaDB database, Apache logs, VSCode settings, `custom.ini` / `custom.conf` |
 | `downloads\` | Download cache; safe to delete |
+
+Project instances use the current project name and stable id directly. DevKit3 does not scan or migrate older folders. If you rename a project, its instance path changes with the name. Standalone tools keep their `instances\launch-<tool>\` folders.
 
 Set the `DEVKIT3_HOME` environment variable to use another folder (for example a portable installation on another drive).
 
@@ -403,3 +460,151 @@ The push failed (no network or expired token); the error was shown when saving. 
 
 **After reinstalling Windows DevKit3 asks for the config token and the tokens password again**
 The copies saved for your Windows account (DPAPI) cannot be read after a reinstall. Enter the config repository token in **Settings** and the tokens password when asked; all other values come back from the tokens file.
+
+---
+
+## 13. Git cheatsheet
+
+Run these commands in the repository folder. With private repositories, open **Terminal** from the project in DevKit3 so Git receives its token configuration. The commands also work in an editor terminal when the editor was started by DevKit3. Replace example branch names, paths and URLs with your own.
+
+### 13.1 Check what changed
+
+| Command | Purpose |
+|---|---|
+| `git status` | Current branch, modified files, staged files and conflicts. Start here. |
+| `git status -sb` | Compact branch and file status. |
+| `git diff` | Changes not yet staged. |
+| `git diff --staged` | Staged changes that will enter the next commit. |
+| `git diff -- src/app.cs` | Changes in one file. |
+| `git log --oneline -15` | Last 15 commits available locally. |
+| `git log --oneline --graph --decorate --all -30` | Recent history with branches and tags. |
+| `git show HEAD` | Most recent commit and its changes. |
+| `git blame -- src/app.cs` | Which commit last changed each line of a file. |
+
+Press **q** to leave Git's pager when a log or diff fills the terminal.
+
+### 13.2 Clone a repository
+
+```bash
+# Minimal history, like DevKit3's project clones
+git clone --depth 1 https://server.example/team/repo.git
+
+# Select a branch when cloning
+git clone --depth 1 --branch main https://server.example/team/repo.git
+
+# Clone the repository and its submodules with minimal history
+git clone --depth 1 --recurse-submodules --shallow-submodules https://server.example/team/repo.git
+```
+
+Choose one clone command. A normal `git clone URL` downloads the full history for the branches it fetches.
+
+### 13.3 Everyday edit, commit and push
+
+```bash
+git status
+git diff
+git add src/app.cs
+git diff --staged
+git commit -m "Describe the change"
+git push
+```
+
+| Command | Purpose |
+|---|---|
+| `git add --all` | Stage all additions, changes and deletions in this repository. Review `git status` first. |
+| `git add -p` | Choose individual changes to stage interactively. |
+| `git restore --staged -- src/app.cs` | Unstage a file; keep its working changes. |
+| `git push -u origin feature/my-change` | First push of a new branch; set its upstream for later `git push` and `git pull`. |
+
+### 13.4 Branches and updating code
+
+| Command | Purpose |
+|---|---|
+| `git branch` | List local branches; `*` marks the current one. |
+| `git branch -a` | List local and known remote branches. |
+| `git switch main` | Switch to an existing local branch. |
+| `git switch -c feature/my-change` | Create and switch to a new branch from the current commit. |
+| `git fetch origin` | Download remote updates without changing checked-out files. |
+| `git pull --ff-only` | Fetch and update the current branch only if no merge is needed. If histories diverged, stop and inspect them. |
+| `git merge origin/main` | Merge the fetched `main` branch into the current branch. May require conflict resolution. |
+| `git branch -d feature/my-change` | Delete a merged local branch after switching away from it. |
+
+For a fresh feature branch, switch to `main`, run `git pull --ff-only`, then `git switch -c feature/my-change`.
+
+### 13.5 Save unfinished work temporarily
+
+```bash
+git stash push -u -m "Work in progress"
+git stash list
+git stash pop
+```
+
+Run the first command before switching tasks, and `git stash pop` when ready to restore the work. `-u` includes untracked files, but not ignored files. Restoring a stash can produce conflicts. `git stash apply` restores without removing the stash entry.
+
+### 13.6 Resolve a merge conflict
+
+1. Run `git status` to find conflicting files.
+2. Edit those files, choose the intended content and remove conflict markers (`<<<<<<<`, `=======`, `>>>>>>>`).
+3. Stage resolved files with `git add path/to/file`.
+4. For a merge, run `git merge --continue`. To cancel that merge instead, use `git merge --abort`.
+
+If the operation was a rebase, use `git rebase --continue` or `git rebase --abort` instead. Check `git status` before deciding which command applies.
+
+### 13.7 Submodules: the two different kinds of update
+
+| Command | Purpose |
+|---|---|
+| `git submodule status --recursive` | Show submodule commits, including nested submodules. |
+| `git submodule update --init --recursive --depth 1` | Initialize missing submodules and check out the exact commits recorded by their parents, with minimal history. |
+| `git submodule update --remote --recursive --depth 1` | Fetch and check out the configured remote branch tips of submodules, with minimal history. This can change the commits recorded by the parent working tree. |
+| `git submodule sync --recursive` | Update local submodule URL settings after URLs change in `.gitmodules`. Does not fetch code. |
+| `git submodule foreach --recursive 'git status -sb'` | Inspect the working state of every initialized submodule. |
+
+After pulling a parent repository, use the update command **without `--remote`** to reproduce the versions that parent expects. Use **`--remote`** when you intentionally want newer submodule code. A submodule update commonly leaves its checkout at a detached HEAD; switch to a branch inside that submodule before developing new changes.
+
+After intentionally updating a submodule, record its new commit in the parent repository:
+
+```bash
+git status
+git add Applications/Global
+git commit -m "Update Global submodule"
+git push
+```
+
+If you edited files inside a submodule, commit and push those changes **inside the submodule first**, then commit its new pointer in the parent. For nested submodules, work from the deepest repository outward. A parent commit does not include uncommitted files inside a submodule.
+
+### 13.8 Shallow clones: get more history or another branch
+
+| Command | Purpose |
+|---|---|
+| `git rev-parse --is-shallow-repository` | `true` means local history is incomplete. |
+| `git fetch --deepen=100 origin` | Download up to 100 more levels of history. |
+| `git fetch --unshallow origin` | Convert a shallow clone to full history available from that remote. Use only when the repository is shallow. |
+| `git fetch origin tag v1.2.3` | Fetch a particular tag. |
+| `git fetch origin feature/my-change:refs/remotes/origin/feature/my-change` | Fetch a branch omitted by the original single-branch clone. |
+| `git switch -c feature/my-change --track origin/feature/my-change` | Create a local branch tracking the fetched remote branch. |
+
+Run history commands inside the repository that needs them; a parent repository and each submodule have separate history. No reclone is needed.
+
+### 13.9 Undo a mistake
+
+| Command | Purpose |
+|---|---|
+| `git restore --staged -- src/app.cs` | Undo staging while keeping file edits. |
+| `git restore -- src/app.cs` | **Discard unstaged edits** in that tracked file, restoring its staged version. Those discarded edits are not saved by this command. |
+| `git revert HEAD` | Create a new commit reversing the latest commit. Useful for changes already shared; may require conflict resolution. |
+| `git reflog -15` | Inspect recent local HEAD movements to locate a previous commit. |
+
+To inspect/recover a commit found in the reflog, create a branch at its hash: `git switch -c recovery/my-work abc1234`. This recovers committed work, not arbitrary unsaved file edits.
+
+### 13.10 Remotes and identity
+
+| Command | Purpose |
+|---|---|
+| `git remote -v` | Show fetch/push URLs. |
+| `git remote get-url origin` | Show the main remote URL. |
+| `git config user.name "Your Name"` | Set the commit author name for this repository. |
+| `git config user.email "you@example.com"` | Set the commit author email for this repository. |
+| `git --version` | Show the Git version used by this terminal. |
+
+Identity settings control commit attribution, not server authentication. Use DevKit3's **Auth variable** and token settings for authentication. For more commands, see the [official Git reference](https://git-scm.com/docs).
